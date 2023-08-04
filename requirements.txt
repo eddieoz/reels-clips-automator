@@ -1,6 +1,7 @@
 pytube
 opencv-python
 openai
-git+https://github.com/m1guelpf/auto-subtitle.git
+# git+https://github.com/m1guelpf/auto-subtitle.git
 python-dotenv
 opencv-contrib-python
+openai-whisper

@@ -44,6 +44,7 @@ $ cd folder
 
 ```
 $ python -m pip install -r requirements.txt
+$ python -m pip install utils/auto-subtitle
 ```
 
 5. Create a `.env` file in the root directory of the project and include your OpenAI API Key:
