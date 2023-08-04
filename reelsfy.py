@@ -11,6 +11,7 @@ import argparse
 
 from dotenv import load_dotenv
 load_dotenv()
+openai.api_key = os.getenv('OPENAI_API_KEY')
 
 # Download video
 def download_video(url, filename):
@@ -100,7 +101,7 @@ def generate_short(input_file, output_file):
 
                     # Perform face detection
                     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-                    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+                    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(50, 50))
 
                     # If faces were detected, initialize the trackers
                     if len(faces) > 0 and not success:
@@ -110,8 +111,8 @@ def generate_short(input_file, output_file):
                             tracker.init(frame, (x, y, w, h))
                             trackers.add(tracker, frame, (x, y, w, h))
 
-                    # Update trackers and get updated positions
-                    success, boxes = trackers.update(frame)
+                        # Update trackers and get updated positions
+                        success, boxes = trackers.update(frame)
 
                     # Switch faces if it's time to do so
                     current_face_index = (current_face_index + 1) % len(face_positions)
