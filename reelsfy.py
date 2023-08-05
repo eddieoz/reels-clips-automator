@@ -44,7 +44,7 @@ def generate_segments(response):
             end_time += (50 - (end_time - start_time))
 
         output_file = f"output{str(i).zfill(3)}.mp4"
-        command = f"ffmpeg -y -i tmp/input_video.mp4 -vf scale='1920:1080' -qscale:v '3' -b:v 6000k -ss {start_time} -to {end_time} tmp/{output_file}"
+        command = f"ffmpeg -y -hwaccel cuda -i tmp/input_video.mp4 -vf scale='1920:1080' -qscale:v '3' -b:v 6000k -ss {start_time} -to {end_time} tmp/{output_file}"
         subprocess.call(command, shell=True)
 
 def generate_short(input_file, output_file):
@@ -148,11 +148,11 @@ def generate_short(input_file, output_file):
         cv2.destroyAllWindows()
 
         # Extract audio from original video
-        command = f"ffmpeg -y -i tmp/{input_file} -vn -acodec copy tmp/output-audio.aac"
+        command = f"ffmpeg -y -hwaccel cuda -i tmp/{input_file} -vn -acodec copy tmp/output-audio.aac"
         subprocess.call(command, shell=True)
 
         # Merge audio and processed video
-        command = f"ffmpeg -y -i tmp/{output_file} -i tmp/output-audio.aac -c copy tmp/final-{output_file}"
+        command = f"ffmpeg -y -hwaccel cuda -i tmp/{output_file} -i tmp/output-audio.aac -c copy tmp/final-{output_file}"
         subprocess.call(command, shell=True)
 
     except Exception as e:
