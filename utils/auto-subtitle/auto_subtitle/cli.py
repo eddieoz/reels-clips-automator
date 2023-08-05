@@ -67,11 +67,10 @@ def main():
         # ).output(out_path).run(quiet=True, overwrite_output=True)
 
         ffmpeg.concat(
-            video.filter('subtitles', srt_path, force_style="Alignment=2,MarginV=35,MarginL=30,MarginR=30,Fontname=Arial,Fontsize=11,PrimaryColour=&H00d7ff,BorderStyle=1"), audio, v=1, a=1
-        ).output(out_path).run(quiet=True, overwrite_output=True)
-
+            video.filter('subtitles', srt_path, force_style="Alignment=2,MarginV=40,MarginL=55,MarginR=55,Fontname=Noto Sans,Fontsize=11,PrimaryColour=&H00d7ff,Outline=1,Shadow=1,BorderStyle=1"), audio, v=1, a=1
+            ).output(out_path).run(quiet=True, overwrite_output=True)
+        
         print(f"Saved subtitled video to {os.path.abspath(out_path)}.")
-
 
 def get_audio(paths):
     temp_dir = tempfile.gettempdir()

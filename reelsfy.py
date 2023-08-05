@@ -64,7 +64,7 @@ def generate_short(input_file, output_file):
         current_face_index = 0
         
         # Constants for cropping    
-        CROP_RATIO = 0.5 # Adjust the ratio to control how much of the face is visible in the cropped video
+        CROP_RATIO = 0.4 # Adjust the ratio to control how much of the face is visible in the cropped video
         VERTICAL_RATIO = 9 / 16  # Aspect ratio for the vertical video
 
         # Load pre-trained face detector from OpenCV
@@ -83,7 +83,8 @@ def generate_short(input_file, output_file):
 
         # Define the codec and create VideoWriter object
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(f"tmp/{output_file}", fourcc, 30, (target_width, target_height))  # Adjust resolution for 9:16 aspect ratio
+        # out = cv2.VideoWriter(f"tmp/{output_file}", fourcc, 30, (target_width, target_height))  # Adjust resolution for 9:16 aspect ratio
+        out = cv2.VideoWriter(f"tmp/{output_file}", fourcc, 30, (1080, 1920))  # Adjust resolution for 9:16 aspect ratio
 
         face_found = False
         success = False
@@ -128,7 +129,8 @@ def generate_short(input_file, output_file):
                     crop_img = frame[crop_y:crop_y2, crop_x:crop_x2]
 
                     # Resize the cropped frame to 9:16 aspect ratio
-                    resized = cv2.resize(crop_img, (target_width, target_height), interpolation = cv2.INTER_AREA)
+                    # resized = cv2.resize(crop_img, (target_width, target_height), interpolation = cv2.INTER_AREA)
+                    resized = cv2.resize(crop_img, (1080, 1920), interpolation = cv2.INTER_AREA)
 
                     # Write the frame into the output file
                     out.write(resized)
