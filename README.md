@@ -13,11 +13,13 @@ Reelsfy is an advanced, AI-powered tool that automates the process of creating I
 
 ## Prerequisites
 
-- Linux operating system
 - Anaconda >= 22.11.1
 - Python >= 3.11
+- FFMPEG >= 4.4.2
 - OpenAI API Key
 - A GPU is optional but recommended for faster processing
+- Developed on Ubuntu 22.04
+
 
 ## Installation
 
