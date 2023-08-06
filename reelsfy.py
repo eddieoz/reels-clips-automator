@@ -1,4 +1,5 @@
 import sys
+import numpy as np
 from pytube import YouTube
 import cv2
 import subprocess
@@ -27,9 +28,6 @@ def generate_segments(response):
   
   for i, segment in enumerate(response):
         print(i, segment)
-
-        # start_time = math.floor(float(segment.get("start_time", 0)))
-        # end_time = math.ceil(float(segment.get("end_time", 0))) + 2
 
         start_time = segment.get("start_time", 0).split('.')[0]
         end_time = segment.get("end_time", 0).split('.')[0]
@@ -64,7 +62,7 @@ def generate_short(input_file, output_file):
         current_face_index = 0
         
         # Constants for cropping    
-        CROP_RATIO = 0.4 # Adjust the ratio to control how much of the face is visible in the cropped video
+        CROP_RATIO = 0.6 # Adjust the ratio to control how much of the face is visible in the cropped video
         VERTICAL_RATIO = 9 / 16  # Aspect ratio for the vertical video
 
         # Load pre-trained face detector from OpenCV
@@ -76,14 +74,17 @@ def generate_short(input_file, output_file):
         # Get the frame dimensions
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        print(f"Image frame_height {frame_height}, frame_width {frame_width}")
+
 
         # Calculate the target width and height for cropping (vertical format)
         target_height = int(frame_height * CROP_RATIO)
         target_width = int(target_height * VERTICAL_RATIO)
+        
+        print(f"Image target_heigth {target_height}, target_width {target_width}")
 
         # Define the codec and create VideoWriter object
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        # out = cv2.VideoWriter(f"tmp/{output_file}", fourcc, 30, (target_width, target_height))  # Adjust resolution for 9:16 aspect ratio
         out = cv2.VideoWriter(f"tmp/{output_file}", fourcc, 30, (1080, 1920))  # Adjust resolution for 9:16 aspect ratio
 
         face_found = False
@@ -102,7 +103,7 @@ def generate_short(input_file, output_file):
 
                     # Perform face detection
                     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-                    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(50, 50))
+                    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=7, minSize=(100, 100))
 
                     # If faces were detected, initialize the trackers
                     if len(faces) > 0 and not success:
@@ -118,8 +119,10 @@ def generate_short(input_file, output_file):
                     # Switch faces if it's time to do so
                     current_face_index = (current_face_index + 1) % len(face_positions)
                     x, y, w, h = [int(v) for v in boxes[current_face_index]]
+                    print (f"Current Face heigth {h} width {w}")
                     
                 if success:
+                    
                     crop_x = max(0, x + (w - target_width) // 2)  # Adjust the crop region to center the face
                     crop_y = max(0, y + (h - target_height) // 2)
                     crop_x2 = min(crop_x + target_width, frame_width)
@@ -127,13 +130,29 @@ def generate_short(input_file, output_file):
 
                     # Crop the frame to the face region
                     crop_img = frame[crop_y:crop_y2, crop_x:crop_x2]
+                    # crop_img = frame[crop_y:crop_y+crop_y2, crop_x:crop_x+crop_x2]
 
-                    # Resize the cropped frame to 9:16 aspect ratio
-                    # resized = cv2.resize(crop_img, (target_width, target_height), interpolation = cv2.INTER_AREA)
-                    resized = cv2.resize(crop_img, (1080, 1920), interpolation = cv2.INTER_AREA)
+                    # Resize the cropped frame to square while keeping aspect ratio
+                    square_size = max(crop_img.shape[0], crop_img.shape[1])
 
+                    # Normalize size for bigger faces        
+                    if max(crop_img.shape[:2]) > 600:
+                        crop_img = frame[crop_y:crop_y2+250, crop_x:crop_x2+250]
+                        square_size = max(crop_img.shape[0], crop_img.shape[1])
+
+                    square_img = np.zeros((square_size, square_size, 3), np.uint8)
+                    x_offset = (square_size - crop_img.shape[1]) // 2
+                    y_offset = (square_size - crop_img.shape[0]) // 2
+                    square_img[y_offset:y_offset+crop_img.shape[0], x_offset:x_offset+crop_img.shape[1]] = crop_img
+
+                    # Resize the square frame to have width 1080
+                    resized = cv2.resize(square_img, (1080, 1080), interpolation = cv2.INTER_AREA)
+
+                    # Add black padding to the top and bottom to make it 1080x1920
+                    pad_img = np.pad(resized, ((420, 420), (0, 0), (0, 0)), mode='constant', constant_values=0)
+                    
                     # Write the frame into the output file
-                    out.write(resized)
+                    out.write(pad_img)
 
                 frame_count += 1
 
