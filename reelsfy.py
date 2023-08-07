@@ -136,7 +136,7 @@ def generate_short(input_file, output_file):
                     square_size = max(crop_img.shape[0], crop_img.shape[1])
 
                     # Normalize size for bigger faces        
-                    if max(crop_img.shape[:2]) > 600:
+                    if max(crop_img.shape[:2]) > 500:
                         crop_img = frame[crop_y:crop_y2+250, crop_x:crop_x2+250]
                         square_size = max(crop_img.shape[0], crop_img.shape[1])
 
