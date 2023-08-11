@@ -8,6 +8,8 @@ import json
 from datetime import datetime
 import os
 from os import path
+import shutil
+
 import argparse
 
 from dotenv import load_dotenv
@@ -62,7 +64,8 @@ def generate_short(input_file, output_file):
         current_face_index = 0
         
         # Constants for cropping    
-        CROP_RATIO = 0.6 # Adjust the ratio to control how much of the face is visible in the cropped video
+        CROP_RATIO_BIG = 1 # Adjust the ratio to control how much of the image (around face) is visible in the cropped video
+        CROP_RATIO_SMALL = 0.5
         VERTICAL_RATIO = 9 / 16  # Aspect ratio for the vertical video
 
         # Load pre-trained face detector from OpenCV
@@ -76,25 +79,20 @@ def generate_short(input_file, output_file):
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         print(f"Image frame_height {frame_height}, frame_width {frame_width}")
 
-
-        # Calculate the target width and height for cropping (vertical format)
-        target_height = int(frame_height * CROP_RATIO)
-        target_width = int(target_height * VERTICAL_RATIO)
-        
-        print(f"Image target_heigth {target_height}, target_width {target_width}")
+        # target_height = int(frame_height * CROP_RATIO)
+        # target_width = int(target_height * VERTICAL_RATIO)
 
         # Define the codec and create VideoWriter object
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(f"tmp/{output_file}", fourcc, 30, (1080, 1920))  # Adjust resolution for 9:16 aspect ratio
 
-        face_found = False
         success = False
         while(cap.isOpened()):
             # Read frame from video
             ret, frame = cap.read()
 
             if ret == True:
-
+                
                 # If we don't have any face positions, detect the faces
                 # Switch faces if it's time to do so
                 if frame_count % switch_interval == 0:
@@ -120,39 +118,46 @@ def generate_short(input_file, output_file):
                     current_face_index = (current_face_index + 1) % len(face_positions)
                     x, y, w, h = [int(v) for v in boxes[current_face_index]]
                     print (f"Current Face heigth {h} width {w}")
+
+                    face_center = (x + w//2, y + h//2)
+
+                    # Determine the size of the rectangle based on the larger dimension of the detected face
+                    # to ensure the face remains inside the 9:16 rectangle.
+                    small_face_limit = 345
+
+                    if w * 16 > h * 9:
+                        w_916 = w
+                        h_916 = int(w * 16 / 9)
+                    else:
+                        h_916 = h
+                        w_916 = int(h * 9 / 16)
+
+                    #Calculate the target width and height for cropping (vertical format)
+                    if max(h, w) < 345:
+                        target_height = int(frame_height * CROP_RATIO_SMALL)
+                        target_width = int(target_height * VERTICAL_RATIO)
+                    else:
+                        target_height = int(frame_height * CROP_RATIO_BIG)
+                        target_width = int(target_height * VERTICAL_RATIO)
                     
                 if success:
-                    
-                    crop_x = max(0, x + (w - target_width) // 2)  # Adjust the crop region to center the face
-                    crop_y = max(0, y + (h - target_height) // 2)
+
+                    # Calculate the top-left corner of the 9:16 rectangle
+                    x_916 = (face_center[0] - w_916 // 2)
+                    y_916 = (face_center[1] - h_916 // 2)
+
+                    crop_x = max(0, x_916 + (w_916 - target_width) // 2)  # Adjust the crop region to center the face
+                    crop_y = max(0, y_916 + (h_916 - target_height) // 2)
                     crop_x2 = min(crop_x + target_width, frame_width)
                     crop_y2 = min(crop_y + target_height, frame_height)
 
+
                     # Crop the frame to the face region
                     crop_img = frame[crop_y:crop_y2, crop_x:crop_x2]
-                    # crop_img = frame[crop_y:crop_y+crop_y2, crop_x:crop_x+crop_x2]
-
-                    # Resize the cropped frame to square while keeping aspect ratio
-                    square_size = max(crop_img.shape[0], crop_img.shape[1])
-
-                    # Normalize size for bigger faces        
-                    if max(crop_img.shape[:2]) > 500:
-                        crop_img = frame[crop_y:crop_y2+250, crop_x:crop_x2+250]
-                        square_size = max(crop_img.shape[0], crop_img.shape[1])
-
-                    square_img = np.zeros((square_size, square_size, 3), np.uint8)
-                    x_offset = (square_size - crop_img.shape[1]) // 2
-                    y_offset = (square_size - crop_img.shape[0]) // 2
-                    square_img[y_offset:y_offset+crop_img.shape[0], x_offset:x_offset+crop_img.shape[1]] = crop_img
-
-                    # Resize the square frame to have width 1080
-                    resized = cv2.resize(square_img, (1080, 1080), interpolation = cv2.INTER_AREA)
-
-                    # Add black padding to the top and bottom to make it 1080x1920
-                    pad_img = np.pad(resized, ((420, 420), (0, 0), (0, 0)), mode='constant', constant_values=0)
                     
-                    # Write the frame into the output file
-                    out.write(pad_img)
+                    resized = cv2.resize(crop_img, (1080, 1920), interpolation = cv2.INTER_AREA)
+                    
+                    out.write(resized)
 
                 frame_count += 1
 
@@ -244,6 +249,8 @@ def __main__():
 
     # Create temp folder
     try: 
+        if os.path.exists("tmp"):
+            shutil.rmtree("tmp")
         os.mkdir('tmp') 
     except OSError as error: 
         print(error)
