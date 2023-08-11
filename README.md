@@ -1,6 +1,8 @@
 # Reelsfy - Reels Clips Automator
 
-Reelsfy is an advanced, AI-powered tool that automates the process of creating Instagram Reels from longer videos. It uses a combination of computer vision to track faces, the GPT model to identify the most engaging parts of the video, and the Whisper ASR system to generate subtitles. This open-source project is perfect for content creators looking to streamline their workflow and optimize content for virality.
+Introducing Isabella Reels, the intelligent core behind Reelsfy. Inspired by the popularity of Instagram Reels, Isabella is here to transform the way you create content. She's the sister bot to Marcelo Resenha, known for assisting with YouTube video editing. With Isabella's capabilities, you can now effortlessly turn longer videos into engaging Instagram Reels.
+
+Reelsfy is an advanced, AI-powered tool that automates the process of creating Instagram Reels from longer videos. Isabella uses a combination of computer vision to track faces, the GPT model to identify the most engaging parts of the video, and the Whisper ASR system to generate subtitles. This open-source project is perfect for content creators looking to streamline their workflow and optimize content for virality.
 
 ## Features
 
