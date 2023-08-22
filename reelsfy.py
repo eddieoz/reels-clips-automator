@@ -50,11 +50,7 @@ def generate_segments(response):
 def generate_short(input_file, output_file):
     try:
 
-        # Initialize trackers and variable to hold face positions
-        trackers = cv2.legacy.MultiTracker_create()
-        face_positions = []
-
-        # Interval to switch faces (in frames)
+        # Interval to switch faces (in frames) (ex. 150 frames = 5 seconds, on a 30fps video)
         switch_interval = 150
 
         # Frame counter
@@ -86,7 +82,7 @@ def generate_short(input_file, output_file):
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(f"tmp/{output_file}", fourcc, 30, (1080, 1920))  # Adjust resolution for 9:16 aspect ratio
 
-        success = False
+        # success = False
         while(cap.isOpened()):
             # Read frame from video
             ret, frame = cap.read()
@@ -102,9 +98,14 @@ def generate_short(input_file, output_file):
                     # Perform face detection
                     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
                     faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=7, minSize=(100, 100))
+           
+                    success = False
 
-                    # If faces were detected, initialize the trackers
-                    if len(faces) > 0 and not success:
+                    if len(faces) > 0:
+                        # Initialize trackers and variable to hold face positions
+                        trackers = cv2.legacy.MultiTracker_create()
+                        face_positions = []
+                        
                         for (x, y, w, h) in faces:
                             face_positions.append((x, y, w, h))
                             tracker = cv2.legacy.TrackerKCF_create()
@@ -117,7 +118,7 @@ def generate_short(input_file, output_file):
                     # Switch faces if it's time to do so
                     current_face_index = (current_face_index + 1) % len(face_positions)
                     x, y, w, h = [int(v) for v in boxes[current_face_index]]
-                    print (f"Current Face heigth {h} width {w}")
+                    print (f"Current Face index {current_face_index} heigth {h} width {w} total faces {len(face_positions)}")
 
                     face_center = (x + w//2, y + h//2)
 
