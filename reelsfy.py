@@ -75,9 +75,6 @@ def generate_short(input_file, output_file):
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         print(f"Image frame_height {frame_height}, frame_width {frame_width}")
 
-        # target_height = int(frame_height * CROP_RATIO)
-        # target_width = int(target_height * VERTICAL_RATIO)
-
         # Define the codec and create VideoWriter object
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(f"tmp/{output_file}", fourcc, 30, (1080, 1920))  # Adjust resolution for 9:16 aspect ratio
@@ -99,8 +96,6 @@ def generate_short(input_file, output_file):
                     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
                     faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=7, minSize=(100, 100))
            
-                    success = False
-
                     if len(faces) > 0:
                         # Initialize trackers and variable to hold face positions
                         trackers = cv2.legacy.MultiTracker_create()
@@ -118,13 +113,10 @@ def generate_short(input_file, output_file):
                     # Switch faces if it's time to do so
                     current_face_index = (current_face_index + 1) % len(face_positions)
                     x, y, w, h = [int(v) for v in boxes[current_face_index]]
+
                     print (f"Current Face index {current_face_index} heigth {h} width {w} total faces {len(face_positions)}")
 
                     face_center = (x + w//2, y + h//2)
-
-                    # Determine the size of the rectangle based on the larger dimension of the detected face
-                    # to ensure the face remains inside the 9:16 rectangle.
-                    small_face_limit = 345
 
                     if w * 16 > h * 9:
                         w_916 = w
@@ -140,25 +132,23 @@ def generate_short(input_file, output_file):
                     else:
                         target_height = int(frame_height * CROP_RATIO_BIG)
                         target_width = int(target_height * VERTICAL_RATIO)
-                    
-                if success:
 
-                    # Calculate the top-left corner of the 9:16 rectangle
-                    x_916 = (face_center[0] - w_916 // 2)
-                    y_916 = (face_center[1] - h_916 // 2)
+                # Calculate the top-left corner of the 9:16 rectangle
+                x_916 = (face_center[0] - w_916 // 2)
+                y_916 = (face_center[1] - h_916 // 2)
 
-                    crop_x = max(0, x_916 + (w_916 - target_width) // 2)  # Adjust the crop region to center the face
-                    crop_y = max(0, y_916 + (h_916 - target_height) // 2)
-                    crop_x2 = min(crop_x + target_width, frame_width)
-                    crop_y2 = min(crop_y + target_height, frame_height)
+                crop_x = max(0, x_916 + (w_916 - target_width) // 2)  # Adjust the crop region to center the face
+                crop_y = max(0, y_916 + (h_916 - target_height) // 2)
+                crop_x2 = min(crop_x + target_width, frame_width)
+                crop_y2 = min(crop_y + target_height, frame_height)
 
 
-                    # Crop the frame to the face region
-                    crop_img = frame[crop_y:crop_y2, crop_x:crop_x2]
-                    
-                    resized = cv2.resize(crop_img, (1080, 1920), interpolation = cv2.INTER_AREA)
-                    
-                    out.write(resized)
+                # Crop the frame to the face region
+                crop_img = frame[crop_y:crop_y2, crop_x:crop_x2]
+                
+                resized = cv2.resize(crop_img, (1080, 1920), interpolation = cv2.INTER_AREA)
+                
+                out.write(resized)
 
                 frame_count += 1
 
