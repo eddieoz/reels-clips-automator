@@ -14,6 +14,35 @@ os.environ["CUDA_VISIBLE_DEVICES"]="0"
 os.environ["GGML_CUDA_NO_PINNED"]="1"
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 
+scale = 4
+target_face_size = 345
+        
+from basicsr.archs.rrdbnet_arch import RRDBNet
+from basicsr.utils.download_util import load_file_from_url
+
+## Added Real-ESRGAN to utils
+from realesrgan import RealESRGANer
+from realesrgan.archs.srvgg_arch import SRVGGNetCompact
+# restorer
+upsampler = RealESRGANer(
+    scale=scale,
+    model_path="weights/realesr-general-x4v3.pth",
+    dni_weight=1,
+    model=SRVGGNetCompact(num_in_ch=3, num_out_ch=3, num_feat=64, num_conv=32, upscale=4, act_type='prelu'),
+    tile=0,
+    tile_pad=10,
+    pre_pad=0,
+    half=not True,
+    gpu_id=0)
+
+from gfpgan import GFPGANer
+face_enhancer = GFPGANer(
+    model_path='https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth',
+    upscale=scale,
+    arch='clean',
+    channel_multiplier=2,
+    bg_upsampler=upsampler)
+
 import argparse
 
 from dotenv import load_dotenv
@@ -48,41 +77,11 @@ def generate_segments(response):
             end_time += (50 - (end_time - start_time))
 
         output_file = f"output{str(i).zfill(3)}.mp4"
-        # command = f"ffmpeg -y -hwaccel cuda -i tmp/input_video.mp4 -vf scale='1920:1080' -qscale:v '3' -b:v 6000k -ss {start_time} -to {end_time} tmp/{output_file}"
-        command = f"ffmpeg -y -i tmp/input_video.mp4 -vf scale='1920:1080' -qscale:v '3' -b:v 6000k -ss {start_time} -to {end_time} tmp/{output_file}"
+        command = f"ffmpeg -y -hwaccel cuda -i tmp/input_video.mp4 -vf scale='1920:1080' -qscale:v '3' -b:v 6000k -ss {start_time} -to {end_time} tmp/{output_file}"
         subprocess.call(command, shell=True)
 
 def generate_short(input_file, output_file, upscale = False, enhance = False):
     try:
-        scale = 3
-        target_face_size = 345
-        if upscale:
-            from basicsr.archs.rrdbnet_arch import RRDBNet
-            from basicsr.utils.download_util import load_file_from_url
-
-            ## Added Real-ESRGAN to utils
-            from realesrgan import RealESRGANer
-            from realesrgan.archs.srvgg_arch import SRVGGNetCompact
-            # restorer
-            upsampler = RealESRGANer(
-                scale=scale,
-                model_path="weights/realesr-general-x4v3.pth",
-                dni_weight=1,
-                model=SRVGGNetCompact(num_in_ch=3, num_out_ch=3, num_feat=64, num_conv=32, upscale=4, act_type='prelu'),
-                tile=0,
-                tile_pad=10,
-                pre_pad=0,
-                half=not True,
-                gpu_id=0)
-        if enhance:
-            from gfpgan import GFPGANer
-            face_enhancer = GFPGANer(
-                model_path='https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth',
-                upscale=scale,
-                arch='clean',
-                channel_multiplier=2,
-                bg_upsampler=upsampler)
-
 
         # Interval to switch faces (in frames) (ex. 150 frames = 5 seconds, on a 30fps video)
         switch_interval = 150
@@ -139,31 +138,11 @@ def generate_short(input_file, output_file, upscale = False, enhance = False):
                             face_positions.append((x, y, w, h))
                             tracker = cv2.legacy.TrackerKCF_create()
                             tracker.init(frame, (x, y, w, h))
-                            trackers.add(tracker, frame, (x, y, w, h))
-
-
-                        # # This code is iterating over the objects in the "frame" list, where each object represents the coordinates of a detected face.
-                        # # The coordinates are represented as (x, y, w, h), where x and y are the top-left corner of the rectangular region, and w and h are the width and height respectively.
-                        
-                        # for (x, y, w, h) in frame:
-                        #     # This line draws a rectangle on the "frame" image to highlight the detected face.
-                        #     # The rectangle is drawn using the cv2.rectangle() function, which takes the following parameters:
-                        #     # - The first parameter is the image on which the rectangle is to be drawn, which is "frame" in this case.
-                        #     # - The second parameter is the top-left coordinate of the rectangle, obtained from the (x, y) values.
-                        #     # - The third parameter is the bottom-right coordinate of the rectangle, obtained by adding the width and height to the top-left coordinate.
-                        #     # - The fourth parameter is the color of the rectangle in RGB format. In this case, it is (0, 255, 0), representing green.
-                        #     # - The fifth parameter is the thickness of the rectangle outline. It is set to 2 in this case.
-                        
-                        #     cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                        
-                        # # This line displays the image with the highlighted faces in a window titled "Faces".
-                        # cv2.imshow('Faces', frame)
-                        
+                            trackers.add(tracker, frame, (x, y, w, h))                  
 
                         # Update trackers and get updated positions
                         try:
                             success, boxes = trackers.update(frame)
-                            print (success, boxes)
                         except Exception as e:
                             print (f"Erro update trackers: {e}")
 
@@ -171,7 +150,7 @@ def generate_short(input_file, output_file, upscale = False, enhance = False):
                     current_face_index = (current_face_index + 1) % len(face_positions)
                     x, y, w, h = [int(v) for v in boxes[current_face_index]]
 
-                    print (f"Current Face index {current_face_index} heigth {h} width {w} total faces {len(face_positions)}, Upscale: {upscale}, Enhance: {enhance} Frame: {frame_count}")
+                    print (f"Frame: {frame_count}, Current Face index {current_face_index} heigth {h} width {w} total faces {len(face_positions)}, Upscale: {upscale}, Enhance: {enhance}")
 
                     face_center = (x + w//2, y + h//2)
 
@@ -212,15 +191,11 @@ def generate_short(input_file, output_file, upscale = False, enhance = False):
                             _, _, crop_img = face_enhancer.enhance(crop_img, has_aligned=False, only_center_face=False, paste_back=True)
 
                 
-                # resized = cv2.resize(crop_img, (1080, 1920), interpolation = cv2.INTER_AREA)
-                resized = cv2.resize(crop_img, (1080, 1920))
+                resized = cv2.resize(crop_img, (1080, 1920), interpolation = cv2.INTER_AREA)
                 
                 out.write(resized)
 
                 frame_count += 1
-
-                if frame_count >= 1500:
-                    print (f'{frame_count}. pare aqui')
 
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
@@ -233,13 +208,11 @@ def generate_short(input_file, output_file, upscale = False, enhance = False):
         cv2.destroyAllWindows()
 
         # Extract audio from original video
-        # command = f"ffmpeg -y -hwaccel cuda -i tmp/{input_file} -vn -acodec copy tmp/output-audio.aac"
-        command = f"ffmpeg -y -i tmp/{input_file} -vn -acodec copy tmp/output-audio.aac"
+        command = f"ffmpeg -y -hwaccel cuda -i tmp/{input_file} -vn -acodec copy tmp/output-audio.aac"
         subprocess.call(command, shell=True)
 
         # Merge audio and processed video
-        # command = f"ffmpeg -y -hwaccel cuda -i tmp/{output_file} -i tmp/output-audio.aac -c copy tmp/final-{output_file}"
-        command = f"ffmpeg -y -i tmp/{output_file} -i tmp/output-audio.aac -c copy tmp/final-{output_file}"
+        command = f"ffmpeg -y -hwaccel cuda -i tmp/{output_file} -i tmp/output-audio.aac -c copy tmp/final-{output_file}"
         subprocess.call(command, shell=True)
 
     except Exception as e:
