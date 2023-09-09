@@ -49,6 +49,22 @@ $ cd folder
 ```
 $ python -m pip install -r requirements.txt
 $ python -m pip install utils/auto-subtitle
+
+$ cd utils
+$ git clone https://github.com/xinntao/Real-ESRGAN.git
+$ cd Real-ESRGAN
+# Install basicsr - https://github.com/xinntao/BasicSR
+# We use BasicSR for both training and inference
+$ python -m pip install basicsr
+# facexlib and gfpgan are for face enhancement
+$ python -m pip install facexlib
+$ python -m pip install gfpgan
+$ python -m pip install -r requirements.txt
+$ python -m python setup.py develop
+cd ../..
+ln -s utils/Real-Real-ESRGAN/gfpgan
+ln -s utils/Real-Real-ESRGAN/realesrgan
+ln -s utils/Real-Real-ESRGAN/weights
 ```
 
 5. Create a `.env` file in the root directory of the project and include your OpenAI API Key:

@@ -10,7 +10,37 @@ import os
 from os import path
 import shutil
 
+from basicsr.archs.rrdbnet_arch import RRDBNet
+from basicsr.utils.download_util import load_file_from_url
+
+## Added Real-ESRGAN to utils
+from realesrgan import RealESRGANer
+from realesrgan.archs.srvgg_arch import SRVGGNetCompact
+
+# restorer
+scale = 4
+target_face_size = 345
+upsampler = RealESRGANer(
+    scale=scale,
+    model_path="weights/realesr-general-x4v3.pth",
+    dni_weight=1,
+    model=SRVGGNetCompact(num_in_ch=3, num_out_ch=3, num_feat=64, num_conv=32, upscale=4, act_type='prelu'),
+    tile=0,
+    tile_pad=10,
+    pre_pad=0,
+    half=not True,
+    gpu_id=0)
+from gfpgan import GFPGANer
+face_enhancer = GFPGANer(
+    model_path='https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth',
+    upscale=scale,
+    arch='clean',
+    channel_multiplier=2,
+    bg_upsampler=upsampler)
+
+
 import argparse
+args = []
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -47,7 +77,7 @@ def generate_segments(response):
         command = f"ffmpeg -y -hwaccel cuda -i tmp/input_video.mp4 -vf scale='1920:1080' -qscale:v '3' -b:v 6000k -ss {start_time} -to {end_time} tmp/{output_file}"
         subprocess.call(command, shell=True)
 
-def generate_short(input_file, output_file):
+def generate_short(input_file, output_file, upscale = False, enhance = False):
     try:
 
         # Interval to switch faces (in frames) (ex. 150 frames = 5 seconds, on a 30fps video)
@@ -114,7 +144,7 @@ def generate_short(input_file, output_file):
                     current_face_index = (current_face_index + 1) % len(face_positions)
                     x, y, w, h = [int(v) for v in boxes[current_face_index]]
 
-                    print (f"Current Face index {current_face_index} heigth {h} width {w} total faces {len(face_positions)}")
+                    print (f"Current Face index {current_face_index} heigth {h} width {w} total faces {len(face_positions)}, Upscale: {upscale}, Enhance: {enhance}")
 
                     face_center = (x + w//2, y + h//2)
 
@@ -126,7 +156,7 @@ def generate_short(input_file, output_file):
                         w_916 = int(h * 9 / 16)
 
                     #Calculate the target width and height for cropping (vertical format)
-                    if max(h, w) < 345:
+                    if max(h, w) < target_face_size:
                         target_height = int(frame_height * CROP_RATIO_SMALL)
                         target_width = int(target_height * VERTICAL_RATIO)
                     else:
@@ -145,6 +175,12 @@ def generate_short(input_file, output_file):
 
                 # Crop the frame to the face region
                 crop_img = frame[crop_y:crop_y2, crop_x:crop_x2]
+                if max(h, w) < target_face_size:
+                    if upscale:
+                        crop_img, _ = upsampler.enhance(crop_img, outscale=scale)
+                    if enhance:
+                        _, _, crop_img = face_enhancer.enhance(crop_img, has_aligned=False, only_center_face=False, paste_back=True)
+
                 
                 resized = cv2.resize(crop_img, (1080, 1920), interpolation = cv2.INTER_AREA)
                 
@@ -179,17 +215,17 @@ def generate_viral(transcript): # Inspiredby https://github.com/NisaarAgharia/AI
         { "segments" :
             [
                 {
-                    "start_time": 00.00, 
-                    "end_time": 00.00,
-                    "description": "Description of the text",
-                    "duration":00,
+                    "start_time": 00:00:00.00, 
+                    "end_time": 00:00:00.00,
+                    "Title": "Title of the reels",
+                    "duration":00.00,
                 },    
             ]
         }
     '''
 
-    prompt = f"Given the following video transcript, analyze each part for potential virality and identify 3 most viral segments from the transcript. Each segment should have nothing less than 50 seconds in duration. The provided transcript is as follows: {transcript}. Based on your analysis, return a JSON document containing the timestamps (start and end), the description of the viral part, and its duration. The JSON document should follow this format: {json_template}. Please replace the placeholder values with the actual results from your analysis."
-    system = f"You are a Viral Segment Identifier, an AI system that analyzes a video's transcript and predict which segments might go viral on social media platforms. You use factors such as emotional impact, humor, unexpected content, and relevance to current trends to make your predictions. You return a structured JSON document detailing the start and end times, the description, and the duration of the potential viral segments."
+    prompt = f"Given the following video transcript, analyze each part for potential virality and identify 3 most viral segments from the transcript. Each segment should have nothing less than 50 seconds in duration. The provided transcript is as follows: {transcript}. Based on your analysis, return a JSON document containing the timestamps (start and end), the engaging title for the viral part, and its duration. The JSON document should follow this format: {json_template}. Please replace the placeholder values with the actual results from your analysis."
+    system = f"You are a Viral Segment Identifier, an AI system that analyzes a video's transcript and predict which segments might go viral on social media platforms. You use factors such as emotional impact, humor, unexpected content, and relevance to current trends to make your predictions. You return a structured JSON document detailing the start and end times, the title, and the duration of the potential viral segments."
     messages = [
         {"role": "system", "content" : system},
         {"role": "user", "content": prompt}
@@ -228,10 +264,17 @@ def __main__():
     parser = argparse.ArgumentParser(description='Create 3 reels or tiktoks from Youtube video')
     parser.add_argument('-v', '--video_id', required=False, help='Youtube video id. Ex: Cuptv7-A4p0 in https://www.youtube.com/watch?v=Cuptv7-A4p0')
     parser.add_argument('-f', '--file', required=False, help='Video file to be used')
+    parser.add_argument('-u', '--upscale', action='store_true', default=False, required=False, help='Upscale small faces')
+    parser.add_argument('-e', '--enhance', action='store_true', default=False, required=False, help='Upscale and enhance small faces')
     args = parser.parse_args()
+    print (args)
     
     if not args.video_id and not args.file: 
         print('Needed at least one argument. <command> --help for help')
+        sys.exit(1)
+
+    if args.upscale and args.enhance:
+        print('You can use --upcale or --enhance. Not both')
         sys.exit(1)
     
     if args.video_id and args.file:
@@ -307,7 +350,7 @@ def __main__():
     for i, segment in enumerate(parsed_content['segments']):  # Replace xx with the actual number of segments
         input_file = f'output{str(i).zfill(3)}.mp4'
         output_file = f'output_cropped{str(i).zfill(3)}.mp4'
-        generate_short(input_file, output_file)
+        generate_short(input_file, output_file, args.upscale, args.enhance)
         generate_subtitle(f"final-{output_file}", video_id, output_folder)
 
 __main__()
