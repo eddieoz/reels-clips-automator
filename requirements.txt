@@ -5,3 +5,4 @@ openai
 python-dotenv
 opencv-contrib-python
 openai-whisper
+Pillow==9.5.0

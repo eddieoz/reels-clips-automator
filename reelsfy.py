@@ -1,4 +1,7 @@
+import random
 import sys
+import textwrap
+import time
 import numpy as np
 from pytube import YouTube
 import cv2
@@ -66,6 +69,7 @@ def generate_segments(response):
 
         start_time = segment.get("start_time", 0).split('.')[0]
         end_time = segment.get("end_time", 0).split('.')[0]
+        title = segment.get("title", 0)
 
         pt = datetime.strptime(start_time,'%H:%M:%S')
         start_time = pt.second + pt.minute*60 + pt.hour*3600
@@ -76,11 +80,80 @@ def generate_segments(response):
         if end_time - start_time < 50:
             end_time += (50 - (end_time - start_time))
 
-        output_file = f"output{str(i).zfill(3)}.mp4"
-        command = f"ffmpeg -y -hwaccel cuda -i tmp/input_video.mp4 -vf scale='1920:1080' -qscale:v '3' -b:v 6000k -ss {start_time} -to {end_time} tmp/{output_file}"
+        output_file = f"{str(title).replace(' ','_')}{str(i).zfill(3)}.mp4"
+        command = f"ffmpeg -y -hwaccel cuda -i tmp/input_video.mp4 -vf scale='1920:1080' -qscale:v '3' -b:v 6000k -ss {start_time} -to {end_time} tmp/{str(output_file)}"
         subprocess.call(command, shell=True)
 
-def generate_short(input_file, output_file, upscale = False, enhance = False):
+def find_smile(frame, output_file):
+    smile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_smile.xml")
+    
+    img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    # Detect the smile
+    smile = smile_cascade.detectMultiScale(img_gray, scaleFactor=1.8, minNeighbors=25, flags=cv2.CASCADE_SCALE_IMAGE)
+    # print(f"smile: {smile}")
+
+    if len(smile) > 0:
+        for x, y, w, h in smile:
+            print("[INFO] Smile found. Saving locally.")
+            # resize image
+            # resizeimg = cv2.resize(frame, (400, 400), interpolation = cv2.INTER_CUBIC)
+            # cv2.imwrite(f"./tmp/smiling-{output_file}.png", frame)
+            return True, frame
+    else:
+        return False, ''
+
+def generate_thumbnail(face, text, thumb_dir):
+    from PIL import Image, ImageFont, ImageDraw 
+
+    # Create a blank image 
+    W, H = (1080, 1920)
+    newthumb = Image.new('RGBA', size=(W, H), color=(0, 0, 0, 0))
+
+    bg_dir = "./backgrounds/"
+    background = Image.open(bg_dir + random.choice(os.listdir(bg_dir))).convert("RGBA")
+    background = background.resize((W, H))
+    # Paste background
+    newthumb.paste(background, (0,0))
+
+    # resizing image
+    img_w, img_h = (450, 450)
+    face = cv2.resize(face, (img_w, img_h))
+
+    # Define the border
+    top = bottom = left = right = 20
+    color = [255, 255, 255] 
+    bordered_face = cv2.copyMakeBorder(face, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
+    bordered_face = cv2.cvtColor(bordered_face, cv2.COLOR_BGR2RGB)
+
+    bordered_image_pil = Image.fromarray(bordered_face)
+ 
+    # Paste face
+
+      # add title
+    title_font = ImageFont.truetype(font='fonts/Arial_Black.ttf', size=100)
+    title_text = textwrap.fill(text, width=15)
+    image_editable = ImageDraw.Draw(newthumb)
+
+    # get sizes
+    text_w, text_h = image_editable.textsize(title_text, font=title_font)
+    face_text_h = img_h + 50 + text_h
+
+    # New positions
+    new_face_h = int((H-face_text_h)/2)
+    new_face_w = int((W-img_w-left-right)/2)
+    new_text_h = (new_face_h + face_text_h - text_h)
+    new_text_w = int((W-text_w)/2)
+
+    # write text in the middle
+    newthumb.paste(bordered_image_pil, box=(new_face_w, new_face_h))
+    image_editable.text((new_text_w, new_text_h), title_text, (255, 255, 255), align='center', font=title_font, stroke_width=10 ,stroke_fill=(0,0,0))
+
+    # Save thumbnail
+    newthumb.save(f"./{thumb_dir}/thumb-{text}.png","PNG")
+
+
+
+def generate_short(input_file, output_file, title = '', upscale = False, enhance = False, thumb = False, thumb_dir = ''):
     try:
 
         # Interval to switch faces (in frames) (ex. 150 frames = 5 seconds, on a 30fps video)
@@ -112,6 +185,7 @@ def generate_short(input_file, output_file, upscale = False, enhance = False):
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(f"tmp/{output_file}", fourcc, 30, (1080, 1920))  # Adjust resolution for 9:16 aspect ratio
         face_positions = []
+        smile_found = False
         # success = False
         while(cap.isOpened()):
             # Read frame from video
@@ -138,7 +212,7 @@ def generate_short(input_file, output_file, upscale = False, enhance = False):
                             face_positions.append((x, y, w, h))
                             tracker = cv2.legacy.TrackerKCF_create()
                             tracker.init(frame, (x, y, w, h))
-                            trackers.add(tracker, frame, (x, y, w, h))                  
+                            trackers.add(tracker, frame, (x, y, w, h))            
 
                         # Update trackers and get updated positions
                         try:
@@ -150,7 +224,7 @@ def generate_short(input_file, output_file, upscale = False, enhance = False):
                     current_face_index = (current_face_index + 1) % len(face_positions)
                     x, y, w, h = [int(v) for v in boxes[current_face_index]]
 
-                    print (f"Frame: {frame_count}, Current Face index {current_face_index} heigth {h} width {w} total faces {len(face_positions)}, Upscale: {upscale}, Enhance: {enhance}")
+                    print (f"Frame: {frame_count}, Current Face index {current_face_index} heigth {h} width {w} total faces {len(face_positions)}, Upscale: {upscale}, Enhance: {enhance}, Thumb: {thumb}")
 
                     face_center = (x + w//2, y + h//2)
 
@@ -190,8 +264,10 @@ def generate_short(input_file, output_file, upscale = False, enhance = False):
                         if enhance:
                             _, _, crop_img = face_enhancer.enhance(crop_img, has_aligned=False, only_center_face=False, paste_back=True)
 
-                
                 resized = cv2.resize(crop_img, (1080, 1920), interpolation = cv2.INTER_AREA)
+
+                if thumb and not smile_found:
+                    smile_found, smile_frame = find_smile(frame[y:y+h, x:x+w], output_file)
                 
                 out.write(resized)
 
@@ -215,6 +291,9 @@ def generate_short(input_file, output_file, upscale = False, enhance = False):
         command = f"ffmpeg -y -hwaccel cuda -i tmp/{output_file} -i tmp/output-audio.aac -c copy tmp/final-{output_file}"
         subprocess.call(command, shell=True)
 
+        if thumb and smile_found:
+            generate_thumbnail(smile_frame, title, thumb_dir)
+
     except Exception as e:
         print(f"Error during video cropping: {str(e)}")
 
@@ -226,15 +305,16 @@ def generate_viral(transcript): # Inspiredby https://github.com/NisaarAgharia/AI
                 {
                     "start_time": 00:00:00.00, 
                     "end_time": 00:00:00.00,
-                    "Title": "Title of the reels",
+                    "title": "Title of the reels",
                     "duration":00.00,
                 },    
             ]
         }
     '''
 
-    prompt = f"Given the following video transcript, analyze each part for potential virality and identify 3 most viral segments of maximum 59 seconds each segment, from the transcript. Each segment should have a minimum of 50 seconds and maximum of 59 seconds in duration. The provided transcript is as follows: {transcript}. Based on your analysis, return a JSON document containing the timestamps (start and end), the engaging title for the viral part, and its duration. The JSON document should follow this format: {json_template}. Please replace the placeholder values with the actual results from your analysis."
-    system = f"You are a Viral Segment Identifier, an AI system that analyzes a video's transcript and predict which segments might go viral on social media platforms. You use factors such as emotional impact, humor, unexpected content, and relevance to current trends to make your predictions. You return a structured JSON document detailing the start and end times, the title, and the duration of the potential viral segments."
+    title_language = 'Portuguese'
+    prompt = f"Given the following video transcript, analyze each part for potential virality and identify 3 most viral segments of maximum 59 seconds each segment, from the transcript. Each segment should have a minimum of 50 seconds and maximum of 59 seconds in duration. The provided transcript is as follows: {transcript}. Based on your analysis, return a JSON document containing the timestamps (start and end), the engaging title for the viral part in {title_language} language, and its duration. The JSON document should follow this format: {json_template}. Please replace the placeholder values with the actual results from your analysis."
+    system = f"You are a Viral Segment Identifier, an AI system that analyzes a video's transcript and predict which segments might go viral on social media platforms. You use factors such as emotional impact, humor, unexpected content, and relevance to current trends to make your predictions. You return a structured JSON document detailing the start and end times, the title in {title_language} language, and the duration of the potential viral segments."
     messages = [
         {"role": "system", "content" : system},
         {"role": "user", "content": prompt}
@@ -275,6 +355,7 @@ def __main__():
     parser.add_argument('-f', '--file', required=False, help='Video file to be used')
     parser.add_argument('-u', '--upscale', action='store_true', default=False, required=False, help='Upscale small faces')
     parser.add_argument('-e', '--enhance', action='store_true', default=False, required=False, help='Upscale and enhance small faces')
+    parser.add_argument('-t', '--thumb', action='store_true', default=False, required=False, help='Create thumbnail')
     args = parser.parse_args()
     print (args)
     
@@ -285,6 +366,18 @@ def __main__():
     if args.upscale and args.enhance:
         print('You can use --upcale or --enhance. Not both')
         sys.exit(1)
+
+    if args.upscale or args.enhance:
+        if not os.path.exists("weights") or not os.path.exists("gfpgan") or not os.path.exists("realesrgan"):
+            args.upscale = args.enhance = False
+            print('Upscale and Enhance require utils/Real-ESRGAN installed and working')
+            sys.exit(1)
+
+    if args.thumb:
+        if not os.path.exists("backgrounds"):
+            args.thumb = False
+            print('Thumbnail require utils/thumbnail_generator installed and working')
+            sys.exit(1)
     
     if args.video_id and args.file:
         print('use --video_id or --file')
@@ -366,9 +459,10 @@ def __main__():
     
     # Loop through each segment
     for i, segment in enumerate(parsed_content['segments']):  # Replace xx with the actual number of segments
-        input_file = f'output{str(i).zfill(3)}.mp4'
-        output_file = f'output_cropped{str(i).zfill(3)}.mp4'
-        generate_short(input_file, output_file, args.upscale, args.enhance)
+        thumbs_dir = f"{output_folder}/{video_id}/"
+        input_file = f"{str(segment['title']).replace(' ','_')}{str(i).zfill(3)}.mp4"
+        output_file = f"{str(segment['title']).replace(' ','_')}_cropped{str(i).zfill(3)}.mp4"
+        generate_short(input_file, output_file, str(segment['title']), args.upscale, args.enhance, args.thumb, thumbs_dir)
         generate_subtitle(f"final-{output_file}", video_id, output_folder)
 
 __main__()
