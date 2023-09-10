@@ -164,5 +164,5 @@ launch.json
 *.aac
 content.txt
 transcript.txt
-backgrounds/
+backgrounds-reels/
 *.png

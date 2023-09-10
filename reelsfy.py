@@ -109,7 +109,7 @@ def generate_thumbnail(face, text, thumb_dir):
     W, H = (1080, 1920)
     newthumb = Image.new('RGBA', size=(W, H), color=(0, 0, 0, 0))
 
-    bg_dir = "./backgrounds/"
+    bg_dir = "./backgrounds-reels/"
     background = Image.open(bg_dir + random.choice(os.listdir(bg_dir))).convert("RGBA")
     background = background.resize((W, H))
     # Paste background
@@ -393,7 +393,7 @@ def __main__():
             sys.exit(1)
 
     if args.thumb:
-        if not os.path.exists("backgrounds"):
+        if not os.path.exists("backgrounds-reels"):
             args.thumb = False
             print('Thumbnail require utils/thumbnail_generator installed and working')
             sys.exit(1)
