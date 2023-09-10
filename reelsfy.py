@@ -395,7 +395,7 @@ def __main__():
     if args.thumb:
         if not os.path.exists("backgrounds-reels"):
             args.thumb = False
-            print('Thumbnail require utils/thumbnail_generator installed and working')
+            print('Thumbnail requires background-reels/<png files> installed and working')
             sys.exit(1)
     
     if args.video_id and args.file:
