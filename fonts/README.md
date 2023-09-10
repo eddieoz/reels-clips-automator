@@ -1,0 +1,1 @@
+Repository of fonts to be used in the thumbnail
