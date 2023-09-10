@@ -60,11 +60,11 @@ $ python -m pip install basicsr
 $ python -m pip install facexlib
 $ python -m pip install gfpgan
 $ python -m pip install -r requirements.txt
-$ python -m python setup.py develop
+$ python setup.py develop
 cd ../..
-ln -s utils/Real-Real-ESRGAN/gfpgan
-ln -s utils/Real-Real-ESRGAN/realesrgan
-ln -s utils/Real-Real-ESRGAN/weights
+ln -s utils/Real-ESRGAN/gfpgan
+ln -s utils/Real-ESRGAN/realesrgan
+ln -s utils/Real-ESRGAN/weights
 ```
 
 5. Create a `.env` file in the root directory of the project and include your OpenAI API Key:
