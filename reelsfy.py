@@ -116,7 +116,7 @@ def generate_thumbnail(face, text, thumb_dir):
     newthumb.paste(background, (0,0))
 
     # resizing image
-    img_w, img_h = (450, 450)
+    img_w, img_h = (500, 500)
     face = cv2.resize(face, (img_w, img_h))
 
     # Define the border
@@ -127,16 +127,35 @@ def generate_thumbnail(face, text, thumb_dir):
 
     bordered_image_pil = Image.fromarray(bordered_face)
  
-    # Paste face
-
-      # add title
+    # add title
     title_font = ImageFont.truetype(font='fonts/Arial_Black.ttf', size=100)
     title_text = textwrap.fill(text, width=15)
     image_editable = ImageDraw.Draw(newthumb)
 
     # get sizes
     text_w, text_h = image_editable.textsize(title_text, font=title_font)
-    face_text_h = img_h + 50 + text_h
+    print(f"1) text w: {text_w}, text h: {text_h}")
+
+    # adjust text size
+    if (text_h > 400):
+        title_font = ImageFont.truetype(font='fonts/Arial_Black.ttf', size=85)
+        title_text = textwrap.fill(text, width=20)
+        image_editable = ImageDraw.Draw(newthumb)
+
+        # get sizes
+        text_w, text_h = image_editable.textsize(title_text, font=title_font)
+        print(f"2) text w: {text_w}, text h: {text_h}")
+    
+    if (text_h > 400):
+        title_font = ImageFont.truetype(font='fonts/Arial_Black.ttf', size=70)
+        title_text = textwrap.fill(text, width=25)
+        image_editable = ImageDraw.Draw(newthumb)
+
+        # get sizes
+        text_w, text_h = image_editable.textsize(title_text, font=title_font)
+        print(f"3) text w: {text_w}, text h: {text_h}")
+
+    face_text_h = img_h + 80 + text_h
 
     # New positions
     new_face_h = int((H-face_text_h)/2)
@@ -144,7 +163,7 @@ def generate_thumbnail(face, text, thumb_dir):
     new_text_h = (new_face_h + face_text_h - text_h)
     new_text_w = int((W-text_w)/2)
 
-    # write text in the middle
+    # Paste face, write text
     newthumb.paste(bordered_image_pil, box=(new_face_w, new_face_h))
     image_editable.text((new_text_w, new_text_h), title_text, (255, 255, 255), align='center', font=title_font, stroke_width=10 ,stroke_fill=(0,0,0))
 
@@ -313,7 +332,7 @@ def generate_viral(transcript): # Inspiredby https://github.com/NisaarAgharia/AI
     '''
 
     title_language = 'Portuguese'
-    prompt = f"Given the following video transcript, analyze each part for potential virality and identify 3 most viral segments of maximum 59 seconds each segment, from the transcript. Each segment should have a minimum of 50 seconds and maximum of 59 seconds in duration. The provided transcript is as follows: {transcript}. Based on your analysis, return a JSON document containing the timestamps (start and end), the engaging title for the viral part in {title_language} language, and its duration. The JSON document should follow this format: {json_template}. Please replace the placeholder values with the actual results from your analysis."
+    prompt = f"Given the following video transcript, analyze each part for potential virality and identify 3 most viral segments of maximum 59 seconds each segment, from the transcript. Each segment should have a minimum of 50 seconds and maximum of 59 seconds in duration. The provided transcript is as follows: {transcript}. Based on your analysis, return a JSON document containing the timestamps (start and end), the engaging but objective title for the viral part in {title_language} language, and its duration. The JSON document should follow this format: {json_template}. Please replace the placeholder values with the actual results from your analysis."
     system = f"You are a Viral Segment Identifier, an AI system that analyzes a video's transcript and predict which segments might go viral on social media platforms. You use factors such as emotional impact, humor, unexpected content, and relevance to current trends to make your predictions. You return a structured JSON document detailing the start and end times, the title in {title_language} language, and the duration of the potential viral segments."
     messages = [
         {"role": "system", "content" : system},
