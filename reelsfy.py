@@ -325,15 +325,15 @@ def generate_viral(transcript): # Inspiredby https://github.com/NisaarAgharia/AI
                     "start_time": 00:00:00.00, 
                     "end_time": 00:00:00.00,
                     "title": "Title of the reels",
-                    "duration":00.00,
+                    "description": "Description of the reels",
                 },    
             ]
         }
     '''
 
     title_language = 'Portuguese'
-    prompt = f"Given the following video transcript, analyze each part for potential virality and identify 3 most viral segments of maximum 59 seconds each segment, from the transcript. Each segment should have a minimum of 50 seconds and maximum of 59 seconds in duration. The provided transcript is as follows: {transcript}. Based on your analysis, return a JSON document containing the timestamps (start and end), the engaging but objective title for the viral part in {title_language} language, and its duration. The JSON document should follow this format: {json_template}. Please replace the placeholder values with the actual results from your analysis."
-    system = f"You are a Viral Segment Identifier, an AI system that analyzes a video's transcript and predict which segments might go viral on social media platforms. You use factors such as emotional impact, humor, unexpected content, and relevance to current trends to make your predictions. You return a structured JSON document detailing the start and end times, the title in {title_language} language, and the duration of the potential viral segments."
+    prompt = f"Given the following video transcript, analyze each part for potential virality and identify 3 most viral segments of maximum 59 seconds each segment, from the transcript. Each segment should have a minimum of 50 seconds and maximum of 59 seconds in duration. The provided transcript is as follows: {transcript}. Based on your analysis, return a JSON document containing the timestamps (start and end), the engaging but objective title for the viral part in {title_language} language, and a creative and engaging description with lists, bullets and emojis in {title_language} language for social media. The JSON document should follow this format: {json_template}. Please replace the placeholder values with the actual results from your analysis."
+    system = f"You are a Viral Segment Identifier, an AI system that analyzes a video's transcript and predict which segments might go viral on social media platforms. You use factors such as emotional impact, humor, unexpected content, and relevance to current trends to make your predictions. You return a structured JSON document detailing the start and end times, the title in {title_language} language, and a creative and engaging description with lists, bullets and emojis in {title_language} language of the potential viral segments."
     messages = [
         {"role": "system", "content" : system},
         {"role": "user", "content": prompt}
@@ -342,7 +342,7 @@ def generate_viral(transcript): # Inspiredby https://github.com/NisaarAgharia/AI
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo-16k",
         messages=messages,
-        max_tokens=512,
+        max_tokens=1024,
         n=1,
         stop=None
     )
@@ -442,36 +442,50 @@ def __main__():
     # Verifies if output_file exists, or create it. If exists, it doesn't call OpenAI APIs
     output_file = f"{output_folder}/{video_id}/content.txt"
     transcript_file = f"{output_folder}/{video_id}/transcript.txt"
-    if (path.exists(output_file) == False):
-        # generate transcriptions
-        transcript = generate_transcript(filename)
-        print (transcript)
-        
-        viral_segments = generate_viral(transcript)
-        content = viral_segments["content"]
-        try:
-            with open(transcript_file, 'w', encoding='utf-8') as file:
-                file.write(transcript)
-        except IOError:
-            print("Error: Failed to write the output file.")
-            sys.exit(1)
-        print("Full transcription written to ", output_file)
+    transcript_done = False
+    # It creates the transcription and tests it. If it is possible to read the json at the end, if exits the loop. Else it do it again
+    transcript = generate_transcript(filename)
+    print (transcript)
+    try:
+        with open(transcript_file, 'w', encoding='utf-8') as file:
+            file.write(transcript)
+    except IOError:
+        print("Error: Failed to write the output file.")
+        sys.exit(1)
+    print("Full transcription written to ", transcript_file)
 
-        try:
-            with open(output_file, 'w', encoding='utf-8') as file:
-                file.write(content)
-        except IOError:
-            print("Error: Failed to write the output file.")
-            sys.exit(1)
-        print("Segments written to ", output_file)
-    else:
-        # Read the contents of the input file
-        try:
-            with open(output_file, 'r', encoding='utf-8') as file:
-                content = file.read()
-        except IOError:
-            print("Error: Failed to read the input file.")
-            sys.exit(1)
+    while (transcript_done == False):
+        if (path.exists(output_file) == False):
+            # Generate viral segments            
+            viral_segments = generate_viral(transcript)
+            content = viral_segments["content"]
+            try:
+                if json.loads(content):
+                    try:
+                        with open(output_file, 'w', encoding='utf-8') as file:
+                            file.write(content)
+                    except IOError:
+                        print("Error: Failed to write the output file.")
+                        sys.exit(1)
+                    print("Segments written to ", output_file)
+                    transcript_done = True
+            except:
+                print("Error: Cant load json transcript")
+        else:
+            # Read the contents of the input file
+            try:
+                with open(output_file, 'r', encoding='utf-8') as file:
+                    content = file.read()
+                    try:
+                        if json.loads(content):
+                            transcript_done = True
+                    except:
+                        os.remove(output_file)
+                        print("Error: Cant load json transcript")
+
+            except IOError:
+                print("Error: Failed to read the input file.")
+                sys.exit(1)
 
     parsed_content = json.loads(content)
     generate_segments(parsed_content['segments'])
